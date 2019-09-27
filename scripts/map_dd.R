@@ -101,6 +101,8 @@ df_mapadd   <- read.table(paste0(rootdir,"stat_mapa_dd_2000_2014.txt"))
 head(df_perdidas)
 head(df_mapadd)
 
+
+################ LET US UPDATE THE DECISION TREE
 names(df) <- c("clump_id","size")
 summary(df)
 
