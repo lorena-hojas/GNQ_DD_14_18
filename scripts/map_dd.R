@@ -98,159 +98,81 @@ system(sprintf("oft-his -i %s -o %s -um %s -maxval %s",
 df_perdidas <- read.table(paste0(rootdir,"stat_perdidas_gfc_2014_2018.txt"))
 df_mapadd   <- read.table(paste0(rootdir,"stat_mapa_dd_2000_2014.txt"))
 
-head(df_perdidas)
-head(df_mapadd)
+names(df_perdidas) <- c("poly_id","total","no_perdidas","perdidas")
+names(df_mapadd)   <- c("poly_id","total","no_data","no_bosque","bosque","degradacion")
+summary(df_perdidas$total - df_mapadd$total)
+
+df <- data.frame(cbind(df_perdidas,df_mapadd[,3:6]))
+
+df$final <- 0
+
+head(df)
 
 
-################ LET US UPDATE THE DECISION TREE
-names(df) <- c("clump_id","size")
-summary(df)
+df[df$no_bosque >  0.7*df$total,]$final <- 1   #### NO BOSQUE == 1
 
-df$new <- 1
-df[df$size > 50,]$new <- 2
+df[df$no_bosque <= 0.7*df$total & df$degradacion > 0.3*df$total & df$perdidas > 0.7* (df$bosque + df$degradacion),]$final <- 32   
+df[df$no_bosque <= 0.7*df$total & df$degradacion > 0.3*df$total & df$perdidas <= 0.7* (df$bosque + df$degradacion)  & df$perdidas > 0.1 * (df$bosque + df$degradacion) ,]$final <- 22
+df[df$no_bosque <= 0.7*df$total & df$degradacion > 0.3*df$total & df$perdidas <= 0.1 * (df$bosque + df$degradacion) ,]$final <- 2
 
-table(df$new)
+df[df$no_bosque <= 0.7*df$total & df$degradacion <= 0.3*df$total & df$perdidas > 0.7* (df$bosque + df$degradacion),]$final <- 31
+df[df$no_bosque <= 0.7*df$total & df$degradacion <= 0.3*df$total & df$perdidas <= 0.7* (df$bosque + df$degradacion) & df$perdidas > 0.1 * (df$bosque + df$degradacion),]$final <- 21
+df[df$no_bosque <= 0.7*df$total & df$degradacion <= 0.3*df$total & df$perdidas <= 0.1 * (df$bosque + df$degradacion) ,]$final <- 2
 
-write.table(df,paste0(rootdir,"bioko_clump_gt_50.txt"),row.names = F,col.names = F)
+df[df$no_data > 0.2* df$total,]$final <- 0
+
+table(df$final)
+
+
+
+
+write.table(df,paste0(rootdir,"reclass.txt"),row.names = F,col.names = F)
 
 ####### Reclassificar para la masquera
-system(sprintf("(echo %s; echo 1; echo 1; echo 3; echo 0) | oft-reclass  -oi %s  -um %s %s",
-               paste0(rootdir,"bioko_clump_gt_50.txt"),
-               paste0(rootdir,"bioko_classificacion_clump_gt_50.tif"),
-               paste0(rootdir,"bioko_classificacion_clump.tif"),
-               paste0(rootdir,"bioko_classificacion_clump.tif")
+system(sprintf("(echo %s; echo 1; echo 1; echo 9; echo 0) | oft-reclass  -oi %s  -um %s %s",
+               paste0(rootdir,"reclass.txt"),
+               paste0(rootdir,"tmp_bioko_mapa_2014_2018.tif"),
+               paste0(seg_dir,"seg_bioko.tif"),
+               paste0(seg_dir,"seg_bioko.tif")
                
 ))
 
 
 
-####################################################################################
-####### COMBINE GFC LAYERS
-####################################################################################
-
-#################### CREATE GFC TREE COVER MAP IN 2007 AT THRESHOLD
-system(sprintf("gdal_calc.py -A %s -B %s --co COMPRESS=LZW --outfile=%s --calc=\"%s\"",
-               paste0(gfc_dir,"gfc_treecover2000.tif"),
-               paste0(gfc_dir,"gfc_lossyear.tif"),
-               paste0(dd_dir,"tmp_gfc_2007_gt",gfc_threshold,".tif"),
-               paste0("(A>",gfc_threshold,")*((B==0)+(B>6))*A")
-))
-
-#################### CREATE GFC LOSS MAP AT THRESHOLD between 2007 and 2016
-system(sprintf("gdal_calc.py -A %s -B %s --co COMPRESS=LZW --outfile=%s --calc=\"%s\"",
-               paste0(gfc_dir,"gfc_treecover2000.tif"),
-               paste0(gfc_dir,"gfc_lossyear.tif"),
-               paste0(dd_dir,"tmp_gfc_loss_0716_gt",gfc_threshold,".tif"),
-               paste0("(A>",gfc_threshold,")*(B>6)*(B<16)")
-))
-
-#################### SIEVE TO THE MMU
-system(sprintf("gdal_sieve.py -st %s %s %s ",
-               mmu,
-               paste0(dd_dir,"tmp_gfc_loss_0716_gt",gfc_threshold,".tif"),
-               paste0(dd_dir,"tmp_gfc_loss_0716_gt",gfc_threshold,"_sieve.tif")
-))
-
-#################### DIFFERENCE BETWEEN SIEVED AND ORIGINAL
-system(sprintf("gdal_calc.py -A %s -B %s --co COMPRESS=LZW --outfile=%s --calc=\"%s\"",
-               paste0(dd_dir,"tmp_gfc_loss_0716_gt",gfc_threshold,".tif"),
-               paste0(dd_dir,"tmp_gfc_loss_0716_gt",gfc_threshold,"_sieve.tif"),
-               paste0(dd_dir,"tmp_gfc_loss_0716_gt",gfc_threshold,"_inf.tif"),
-               paste0("(A>0)*(A-B)+(A==0)*(B==1)*0")
-))
-
-
-#################### CREATE GFC TREE COVER MASK IN 2016 AT THRESHOLD
-system(sprintf("gdal_calc.py -A %s -B %s --co COMPRESS=LZW --outfile=%s --calc=\"%s\"",
-               paste0(dd_dir,"tmp_gfc_2007_gt",gfc_threshold,".tif"),
-               paste0(gfc_dir,"gfc_lossyear.tif"),
-               paste0(dd_dir,"tmp_gfc_2016_gt",gfc_threshold,".tif"),
-               paste0("(A>0)*((B>=16)+(B==0))")
-))
-
-
-#################### SIEVE TO THE MMU
-system(sprintf("gdal_sieve.py -st %s %s %s ",
-               mmu,
-               paste0(dd_dir,"tmp_gfc_2016_gt",gfc_threshold,".tif"),
-               paste0(dd_dir,"tmp_gfc_2016_gt",gfc_threshold,"_sieve.tif")
-))
-
-#################### DIFFERENCE BETWEEN SIEVED AND ORIGINAL
-system(sprintf("gdal_calc.py -A %s -B %s --co COMPRESS=LZW --outfile=%s --calc=\"%s\"",
-               paste0(dd_dir,"tmp_gfc_2016_gt",gfc_threshold,".tif"),
-               paste0(dd_dir,"tmp_gfc_2016_gt",gfc_threshold,"_sieve.tif"),
-               paste0(dd_dir,"tmp_gfc_2016_gt",gfc_threshold,"_inf.tif"),
-               paste0("(A>0)*(A-B)+(A==0)*(B==1)*0")
-))
-
-#################### COMBINATION INTO DD MAP (1==NF, 2==F, 3==Df, 4==Dg, 11==agriculture)
-system(sprintf("gdal_calc.py -A %s -B %s -C %s -D %s -E %s -F %s --co COMPRESS=LZW --outfile=%s --calc=\"%s\"",
-               paste0(dd_dir,"tmp_gfc_2007_gt",gfc_threshold,".tif"),
-               paste0(dd_dir,"tmp_gfc_loss_0716_gt",gfc_threshold,"_sieve.tif"),
-               paste0(dd_dir,"tmp_gfc_loss_0716_gt",gfc_threshold,"_inf.tif"),
-               paste0(ag_dir,"commodities.tif"),
-               paste0(dd_dir,"tmp_gfc_2016_gt",gfc_threshold,"_sieve.tif"),
-               paste0(dd_dir,"tmp_gfc_2016_gt",gfc_threshold,"_inf.tif"),
-               paste0(dd_dir,"tmp_dd_map_0716_gt",gfc_threshold,".tif"),
-               paste0("(A==0)*1+(A>0)*(D==0)*((B==0)*(C==0)*((E>0)*2+(F>0)*1)+(B>0)*3+(C>0)*4)+(A>0)*(D>0)*11")
-))
-
-################################################################################
-#################### PROJECT IN UTM 29
-################################################################################
-system(sprintf("gdalwarp -t_srs \"%s\" -overwrite -ot Byte -co COMPRESS=LZW %s %s",
-               "EPSG:32629",
-               paste0(dd_dir,"tmp_dd_map_0716_gt",gfc_threshold,".tif"),
-               paste0(dd_dir,"tmp_dd_map_0716_gt",gfc_threshold,"_utm.tif")
-))
-
-#################### Create a country boundary mask at the GFC resolution (TO BE REPLACED BY NATIONAL DATA IF AVAILABLE) 
-system(sprintf("python %s/oft-rasterize_attr.py -v %s -i %s -o %s -a %s",
-               scriptdir,
-               paste0(gadm_dir,"Liberia_dd_utm.shp"),
-               paste0(dd_dir,"tmp_dd_map_0716_gt",gfc_threshold,"_utm.tif"),
-               paste0(gadm_dir,"Liberia_dd_utm.tif"),
-               "ID"
-))
-
-#################### CLIP TO COUNTRY BOUNDARIES
-system(sprintf("gdal_calc.py -A %s -B %s  --co COMPRESS=LZW --outfile=%s --calc=\"%s\"",
-               paste0(dd_dir,"tmp_dd_map_0716_gt",gfc_threshold,"_utm.tif"),
-               paste0(gadm_dir,"Liberia_dd_utm.tif"),
-               paste0(dd_dir,"tmp_dd_map_0716_gt",gfc_threshold,"_utm_country.tif"),
-               paste0("(B>0)*A")
-))
 
 #################### CREATE A COLOR TABLE FOR THE OUTPUT MAP
-my_classes <- c(0,1,2,3,4,11)
-my_colors  <- col2rgb(c("black","grey","darkgreen","red","orange","purple"))
+my_classes <- c(0,1,2,21,22,31,32)
+my_colors  <- col2rgb(c("black","grey","darkgreen","orange","yellow","red","purple"))
 
 pct <- data.frame(cbind(my_classes,
                         my_colors[1,],
                         my_colors[2,],
                         my_colors[3,]))
 
-write.table(pct,paste0(dd_dir,"color_table.txt"),row.names = F,col.names = F,quote = F)
+write.table(pct,paste0(rootdir,"color_table.txt"),row.names = F,col.names = F,quote = F)
 
 
+system(sprintf("gdal_translate -ot Byte -co COMPRESS=LZW %s %s",
+               paste0(rootdir,"tmp_bioko_mapa_2014_2018.tif"),
+               paste0(rootdir,"tmp_byte_bioko_mapa_2014_2018.tif")
+))
 
 
 ################################################################################
 #################### Add pseudo color table to result
 ################################################################################
 system(sprintf("(echo %s) | oft-addpct.py %s %s",
-               paste0(dd_dir,"color_table.txt"),
-               paste0(dd_dir,"tmp_dd_map_0716_gt",gfc_threshold,"_utm_country.tif"),
-               paste0(dd_dir,"tmp_dd_map_0716_gt",gfc_threshold,"pct.tif")
+               paste0(rootdir,"color_table.txt"),
+               paste0(rootdir,"tmp_byte_bioko_mapa_2014_2018.tif"),
+               paste0(rootdir,"tmp_pct_bioko_mapa_2014_2018.tif")
 ))
 
 ################################################################################
 #################### COMPRESS
 ################################################################################
 system(sprintf("gdal_translate -ot Byte -co COMPRESS=LZW %s %s",
-               paste0(dd_dir,"tmp_dd_map_0716_gt",gfc_threshold,"pct.tif"),
-               paste0(dd_dir,"dd_map_0716_gt",gfc_threshold,"_utm_20181014.tif")
+               paste0(rootdir,"tmp_pct_bioko_mapa_2014_2018.tif"),
+               paste0(rootdir,"bioko_mapa_2014_2018.tif")
 ))
 
 
