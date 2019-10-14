@@ -9,7 +9,7 @@ data_dir    <- paste0(rootdir,"data/")
 tmp_dir     <- paste0(rootdir,"tmp/")
 gfc_dir     <- paste0(data_dir,"gfc/")
 seg_dir     <- paste0(data_dir,"segmentation/")
-edd_dir     <- paste0(data_dir,"dd_2000_2014_map/")
+edd_dir     <- paste0(data_dir,"dd_2004_2014_map/")
 stt_dir     <- paste0(data_dir,"stat/")
 map_dir     <- paste0(data_dir,"dd_2014_2018/")
 
