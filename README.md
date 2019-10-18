@@ -62,8 +62,12 @@ Rasterized the segmentation to the same projection, extent and cell size of the 
 ALIGN PRODUCTS PL1
 Convert GFC forest year losses 2000-2018 to the same projection, extent and cell size of the DD map 2004-14
 
-FOREST NON FOREST DEGRADATION FOR 2000-2014
-Reclassify the DD map 2004-14 into Non forest (NF), Intact Forest (FF), Degradation (DG) and Non Data (bnb_2014.tif) 
+FOREST NON FOREST DEGRADED FOR 2015
+Reclassify the DD map 2004-14 into Non forest (NF), Intact Forest (FF), Degradation (DG) and Non Data (bnb_2015.tif) 
+
+
+FOREST NON FOREST DEGRADED FOR 2014
+Remove the forest losses of 2014 to the previous map (bnb_2014.tif)
 
 LOSS NO LOSS MASK FOR 2014-2018
 Reclassify GFC forest year losses 2000-2018 into Loss (L) or Non loss (NL) between 2014-18 (pnp_aea.tif) 
